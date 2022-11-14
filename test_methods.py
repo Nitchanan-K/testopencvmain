@@ -31,21 +31,33 @@ result = cv2.matchTemplate(base_img, poring_front,cv2.TM_CCORR_NORMED)
 
 # threshold
 threshold = .96
+
 yloc, xloc = np.where(result >= threshold)
 # return manys location that matcted
 print(len(xloc),len(yloc))
+
+# locations 
+locations = np.where(result >= threshold)
+locations = list(zip(*locations[::-1]))
+print(locations)
 
 # make rectagle in forloop 
 '''
 for (x,y) in zip(xloc,yloc):
     cv2.rectangle(base_img, (x,y), (x + w, y + h), (0,255,255), 2)
 '''
-
+'''
+for loc in location :
+    top_left =loc 
+    bottom_right = (top_left[0] + w, top_left[1] + h)
+    cv2. rectangle(base , top_left, bottom_right, line_color, line_type)
+'''
+ 
 
 
 # what is a rectangle?
 # x, y ,w h
-rectangles =  [ ]
+rectangles =  []
 for (x,y) in zip(xloc,yloc):
     rectangles.append([int(x), int(y), int(w), int(h)])
     rectangles.append([int(x), int(y), int(w), int(h)])
