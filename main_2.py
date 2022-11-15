@@ -3,7 +3,7 @@ import numpy as np
 
 
 def findClickPositions(base_img, obj_img, threshold = 0.96, debug_mode = None):
-    base_img = cv2.imread(base_img)
+    
     obj_img = cv2.imread(obj_img)
     
 
@@ -12,6 +12,7 @@ def findClickPositions(base_img, obj_img, threshold = 0.96, debug_mode = None):
     obj_h = obj_img.shape[0]
 
     # found result in case of using cv2.TM_CCORR_NORMED
+    # base_img passing by realtime window capture
     method = cv2.TM_CCORR_NORMED
     result = cv2.matchTemplate(base_img, obj_img,method)
 
@@ -40,7 +41,7 @@ def findClickPositions(base_img, obj_img, threshold = 0.96, debug_mode = None):
         
         
         line_color = (0,255,255)
-        line_type = cv2.LINE_4
+        line_type = 2
         marker_color = (0,255,255)
         marker_type = cv2.MARKER_CROSS
         
@@ -58,14 +59,14 @@ def findClickPositions(base_img, obj_img, threshold = 0.96, debug_mode = None):
                 top_left = (x , y)
                 bottom_right = (x + w, y + h)
                 # Draw the box 
-                cv2. rectangle(base_img , top_left, bottom_right, line_color, line_type,)
+                cv2.rectangle(base_img , top_left, bottom_right, line_color, line_type)
             elif debug_mode == 'points':
                 cv2.drawMarker(base_img, (center_x,center_y), marker_color,marker_type)
 
             
         if debug_mode: 
             cv2.imshow('Matches', base_img)
-            cv2.waitKey()
+            #cv2.waitKey()
         
     return points
 

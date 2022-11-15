@@ -1,0 +1,6 @@
+# poring HSV filter
+hsv_filter = HsvFilter(0,0,0,179,255,255,255,0,0,25)
+
+threshold = 0.80
+
+method=cv2.TM_CCORR_NORMED

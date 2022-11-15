@@ -1,56 +1,92 @@
 import cv2 
-import numpy as np
+import numpy as np 
+import os 
 
-base_img = cv2.imread('base_img.jpg', cv2.IMREAD_UNCHANGED)
-#base = cv2.cvtColor(base, cv2.COLOR_RGB2GRAY)
-
-poring_back = cv2.imread('poring_back.png', cv2.IMREAD_UNCHANGED)
-poring_back = cv2.cvtColor(poring_back, cv2.COLOR_RGB2GRAY)
-
-poring_front = cv2.imread('poring_front.png', cv2.IMREAD_UNCHANGED)
-poring_front = cv2.cvtColor(poring_front , cv2.COLOR_RGB2GRAY)
-
-# methods
-methods = [cv2.TM_CCOEFF, cv2.TM_CCOEFF_NORMED,cv2.TM_CCORR, cv2.TM_CCORR_NORMED, cv2.TM_SQDIFF,cv2.TM_SQDIFF_NORMED]
-
-for method in methods:
-    img2 = base_img.copy()
-    result = cv2.matchTemplate(base_img, poring_front, cv2.TM_CCOEFF_NORMED)
+from time import time, sleep
+import pyautogui
+# from PIL import ImageGrab
+from windowcapture import WindowCapture
+from vision import Vision
+from hsvfilter import HsvFilter
+from threading import Thread
 
 
-# retrun match result 
-min_val, max_val, min_loc, max_loc = cv2.minMaxLoc(result)
+# Note the game window need to open first on screen before run main.py
+
+# initialize the WindowCapture class
+wincap = WindowCapture('Ragnarok')
+# initialize the Vision class
+vision_poring = Vision('poring_front_hsv.jpg')
+# initialize the trackbar window
+vision_poring.init_control_gui()
+# poring HSV filter
+hsv_filter = HsvFilter(0,0,0,179,255,255,255,0,0,25)
+
+# global variable used to notify the main loop of when the
+# bot actions have completed
+is_bot_in_action = False 
+ 
+# this function will be perform inside another thread
+def bot_actions(rectangles):
+    if len(rectangles) > 0:
+        print('bot_ actions working')
+        # garb first object in the list 
+        # to click
+        targets = Vision.get_click_points(rectangles)
+        target = wincap.get_screen_position(targets[0]) # get the ture position
+        pyautogui.moveTo(x=target[0], y=target[1])
+        pyautogui.click()
+        # wait 5 second for killing to complete
+        sleep(5)
+
+    # let the main loop know whem this process is completed
+    global is_bot_in_action
+    is_bot_in_action = False
 
 
+loop_time = time()
+while(True):
+
+    screenshot = wincap.get_screenshot() # best way
+    # screenshot = ImageGrab.grab() better way
+    # screenshot = pyautogui.screenshot() slower way 
+
+    # convert it to cv2 img inces not using window_capture function
+        #screenshot = np.array(screenshot)
+        #screenshot = cv2.cvtColor(screenshot, cv2.COLOR_RGB2BGR)
 
 
-print(max_loc)
-print(max_val,min_val)
+    # ***IMPROTANT use .JPG*** 
+    # best case poring_front_left //0.96
+    # point can use with bot
 
-# get the wight and hight from face img 
-w = poring_front.shape[1]
-h = poring_front.shape[0]
+    # ore-process the image
+    processed_image = vision_poring.apply_hsv_filter(screenshot, hsv_filter)
 
-# make rectagle 
-cv2.rectangle(base_img,max_loc, (max_loc[0] + w, max_loc[1] + h), (0,255,255), 2)
+    # do object detections
+    rectangles = vision_poring.find(processed_image, threshold = 0.80)
+    
+    # draw the detection results onto the original image (give screenshot imgae // give list of rects)
+    output_image = vision_poring.draw_rectangles(screenshot, rectangles)
 
-# threshold
-threshold = .50
-yloc, xloc = np.where(result >= threshold)
-# return manys location that matcted
-print(len(xloc),len(yloc))
+    # display real time window capture
+    cv2.imshow('Processed', processed_image)
+    cv2.imshow('Matches', output_image)
 
-# make rectagle in forloop 
-for (x,y) in zip(xloc,yloc):
-    cv2.rectangle(base_img, (x,y), (x + w, y + h), (0,255,255), 2)
-
-
-cv2.imshow('Base',base_img)
-cv2.imshow('Result', result)
-
-cv2.waitKey()
-cv2.destroyAllWindows()
+    # take bot actions
+    # run the function in a thread separate from main thread
+    if not is_bot_in_action:
+        is_bot_in_action = True
+        t = Thread(target=bot_actions, args=(rectangles,))    
+        t.start()
 
 
+    # check time 
+    print(f'FPS {(1 / (time() - loop_time))}')
+    loop_time = time()
 
+    if cv2.waitKey(1) == ord('q'):
+        cv2.destroyAllWindows()
+        break
 
+print('Done.')
