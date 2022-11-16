@@ -5,9 +5,15 @@ from time import time
 import pyautogui
 from PIL import ImageGrab
 import win32gui, win32ui, win32con
+from threading import Thread, Lock
+
 
 class WindowCapture:
 
+    # threading properties
+    stopped = True
+    lock = None
+    screenshot = None
     # properties
     w = 0
     h = 0
@@ -19,7 +25,10 @@ class WindowCapture:
 
     # constructor
     def __init__(self, window_name=None):
+        # create a thread lock object 
+        self.lock = Lock()
 
+        # if not define window name get entire screen window
         if window_name is None:
             self.hwnd = win32gui.GetDesktopWindow()
         else:
@@ -33,6 +42,7 @@ class WindowCapture:
         self.h = window_rect[3] - window_rect[1]
 
         # account for the window border and titlebar and cut them off
+        # adjust border and tittle bar depend on that window ratio
         border_pixels = 4 #4
         titlebar_pixels = 24 #24
         self.w = self.w - (border_pixels * 2)
@@ -40,7 +50,7 @@ class WindowCapture:
         self.cropped_x = border_pixels
         self.cropped_y = titlebar_pixels
 
-      # set the cropped coordinates offset so we can translate screenshot
+        # set the cropped coordinates offset so we can translate screenshot
         # images into actual screen positions
         self.offset_x = window_rect[0] + self.cropped_x
         self.offset_y = window_rect[1] + self.cropped_y
@@ -48,7 +58,7 @@ class WindowCapture:
 
     def get_screenshot(self):
         
-         # get the window image data
+        # get the พฟไ window image data
         wDC = win32gui.GetWindowDC(self.hwnd)
         dcObj = win32ui.CreateDCFromHandle(wDC)
         cDC = dcObj.CreateCompatibleDC()
@@ -58,10 +68,9 @@ class WindowCapture:
         cDC.BitBlt((0, 0), (self.w, self.h), dcObj, (self.cropped_x, self.cropped_y), win32con.SRCCOPY)
 
         # convert the raw data into a format opencv can read
-        #dataBitMap.SaveBitmapFile(cDC, 'debug.bmp')
+        # dataBitMap.SaveBitmapFile(cDC, 'debug.bmp')
         signedIntsArray = dataBitMap.GetBitmapBits(True)
         img = np.fromstring(signedIntsArray, dtype='uint8')
-        
         img.shape = (self.h, self.w, 4)
         
         # Free Resources 
@@ -71,11 +80,10 @@ class WindowCapture:
         win32gui.DeleteObject(dataBitMap.GetHandle())
         
         # drop the alpha channel, or cv.matchTemplate() will throw an error like:
-        #   error: (-215:Assertion failed) (depth == CV_8U || depth == CV_32F) && type == _templ.type() 
-        #   && _img.dims() <= 2 in function 'cv::matchTemplate'
+        # error: (-215:Assertion failed) (depth == CV_8U || depth == CV_32F) && type == _templ.type() 
+        # && _img.dims() <= 2 in function 'cv::matchTemplate'
         img = img[...,:3]
         
-
         # make image C_CONTIGUOUS to avoid errors that look like:
         #   File ... in draw_rectangles
         #   TypeError: an integer is required (got type tuple)
@@ -98,4 +106,22 @@ class WindowCapture:
     def get_screen_position(self, pos):
         return (pos[0] + self.offset_x, pos[1] + self.offset_y)
 
-test = WindowCapture()
+    # threading methods 
+
+    def start(self):
+        self.stopped = False
+        t = Thread(target=self.run)
+        t.start()
+    
+    def stop(self):
+        self.stopped = True
+
+    def run(self):
+        # TODO: youcan write your own time/iterations calculation to determine how fast this is
+        while not self.stopped:
+            # get update iamge of the game 
+            screenshot = self.get_screenshot()
+            # lock the thread while updating the result
+            self.lock.acquire()
+            self.screenshot = screenshot
+            self.lock.release()

@@ -6,6 +6,60 @@ class Vision:
     # constants 
     TRACKBAR_WINDOW = "Trackbars"
 
+    # properties 
+    obj_img = None
+    obj_w = 0 
+    obj_h = 0
+    method = None
+
+    # constructor
+    def __init__(self, obj_img_path, method=cv2.TM_CCORR_NORMED): 
+
+        # load img 
+        self.obj_img = cv2.imread(obj_img_path,cv2.IMREAD_UNCHANGED)
+
+        # get shape from img 
+        self.obj_w = self.obj_img.shape[1]
+        self.obj_h = self.obj_img.shape[0]
+
+        # # TM_CCOEFF, TM_CCOEFF_NORMED, TM_CCORR, TM_CCORR_NORMED, TM_SQDIFF, TM_SQDIFF_NORMED
+        # found better result in case of using cv2.TM_CCORR_NORMED for poring
+        self.method = method
+
+        
+    def find(self, base_img, threshold = 0.96,max_results=10):
+        # run opencv algorithm
+        result = cv2.matchTemplate(base_img, self.obj_img, self.method)
+
+        # locations found with >= threshold
+        locations = np.where(result >= threshold)
+        locations = list(zip(*locations[::-1]))
+
+        # if we found no results, return now. this reshape of the empty array allows us to 
+        # concatenate together results without causing an error
+        if not locations:
+            return np.array([], dtype=np.int32).reshape(0, 4)
+
+        # fisrt make list fo [x , y, w, h] rectangles
+        rectangles = []
+        for loc in locations:
+            rect = [int(loc[0]), int(loc[1]), self.obj_w, self.obj_h]
+            # append it twice to make sure that it overlap
+            rectangles.append(rect)
+            rectangles.append(rect)
+
+        # gourping rectagles
+        rectangles, weights = cv2.groupRectangles(rectangles, 1, 0.2)
+        # print(rectangles)
+
+        # for performance reasons, return a limited number of results.
+        # these aren't necessarily the best results.
+        if len(rectangles) > max_results:
+            print('Warning: too many results, raise the threshold.')
+            rectangles = rectangles[:max_results]
+
+        return rectangles
+
 
     # given a lits of [x, y, w, h] rectangles returned by find(), convert those into a list
     # of [x, y] positions in the center of those rectangles where we can click on thoes found items
@@ -22,6 +76,7 @@ class Vision:
             points.append((center_x,center_y))
                 
         return points
+
 
     # given a list of [x, y, w, h] rectangles and a canvas image to draw on, return an image with
     # all of those rectangles drawn
